@@ -74,7 +74,7 @@ cd artifacts/goQuorum
 for ((i=0; i<$N; i++))
 do 
    echo "----------- for $i ------------"    
-   sed -i "$((i+2)) s/<HOST>/127.0.0.1/" static-nodes.json
+   sed -i "$((i+2)) s/<HOST>/0.0.0.1/" static-nodes.json
    sed -i "$((i+2)) s/30303/3030$i/" static-nodes.json
    sed -i "$((i+2)) s/53000/5300$i/" static-nodes.json
 
@@ -151,12 +151,14 @@ do
     --networkid 1337 --nodiscover --verbosity 5 \
     --syncmode full \
     --istanbul.blockperiod 5 --mine --miner.threads 1 --miner.gasprice 0 --emitcheckpoints \
-    --http --http.addr 127.0.0.1 --http.port 2200$1 --http.corsdomain "*" --http.vhosts "*" \
-    --ws --ws.addr 127.0.0.1 --ws.port 3200$1 --ws.origins "*" \
+    --http --http.addr 0.0.0.0 --http.port 2200$1 --http.corsdomain "*" --http.vhosts "*" \
+    --ws --ws.addr 0.0.0.0 --ws.port 3200$1 --ws.origins "*" \
     --http.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
     --ws.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
     --unlock ${ADDRESS} --allow-insecure-unlock --password ./data/keystore/accountPassword \
     --port 3030$i &
+    sleep 5
+    disown 
 
 done 
 

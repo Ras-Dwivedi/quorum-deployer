@@ -1,9 +1,34 @@
 #This file creates a first test network. It is suppose to work like byfn network of Hyperledger Fabric
 
-#source bashrc file to load the environment variable
-source ~/.bshrc
+#Parameters
+read -p 'number of nodes: ' N
+#
+##source bashrc file to load the environment variable
+source ~/.bash_profile
+source ~/.bashrc
+source ~/.profile
+#
+echo "checking versions"
+echo node -v
+echo go version 
+if [["$(node -v)" < "v16"]];
+then
+    echo "Please use the latest node version. ......Exiting"
+    exit 0
+else
+     echo "node version installed is " 
+     node -v
+fi
+if [ $? -eq 0 ]; then
+  echo "All pre-requisite found"
+else
+  echo "unable to found pre-requisite.... exiting "
+  exit 0
+fi
 
-#check if QBFT folder exist 
+echo "creating directory structure"
+##exit 0
+##Clean the previous deployment
 if [[ -d QBFT-Network ]]
 then 
 	echo "Deleting material from previous deployment"
@@ -12,133 +37,127 @@ then
 else 
 	mkdir QBFT-Network
 fi
-
+#
 cd QBFT-Network
-#Replace this via for loop and make number of nodes a variable
-mkdir -p Node-0/data/keystore Node-1/data/keystore Node-2/data/keystore Node-3/data/keystore Node-4/data/keystore
-
-#could be commented out
+#
+#Create directory structure
+for ((i=0; i<$N; i++))
+do 
+   mkdir -p Node-$i/data/keystore
+done 
+#
+#List the directory structure
 echo "Following directories were created "
 tree
 
 #Generating artifacts
-npx quorum-genesis-tool --consensus qbft --chainID 1337 --blockperiod 5 --requestTimeout 10 --epochLength 30000 --difficulty 1 --gasLimit '0xFFFFFF' --coinbase '0x0000000000000000000000000000000000000000' --validators 5 --members 0 --bootnodes 0 --outputPath 'artifacts'
+npx quorum-genesis-tool --consensus qbft --chainID 1337 --blockperiod 5 --requestTimeout 10 --epochLength 30000 --difficulty 1 --gasLimit '0xFFFFFF' --coinbase '0x0000000000000000000000000000000000000000' --validators $N --members 0 --bootnodes 0 --outputPath 'artifacts'
 
-#check whether this command was executed successfully
-# You ned to check whether Quorum Genesis Tool was installed
+# #check whether this command was executed successfully
+if [ $? -eq 0 ]; then
+  echo OK
+else
+  echo "unable to generated artifacts .... exiting "
+  exit 0
+fi
+#
+#moving artifacts
+mv artifacts/$(ls artifacts)/* artifacts/
 
-#Need to access folder name before this command could be executed
-mv artifacts/2022-02-23-12-34-35/* artifacts
+echo "current directory structure"
+tree
 
+#Update IP and ports
 cd artifacts/goQuorum
 
-#Write code to extract keys from static-nodes.json and then change the host name and ports
+#update IP and port number
+for ((i=0; i<$N; i++))
+do 
+   echo "----------- for $i ------------"    
+   sed -i "$((i+2)) s/<HOST>/127.0.0.1/" static-nodes.json
+   sed -i "$((i+2)) s/30303/3030$i/" static-nodes.json
+   sed -i "$((i+2)) s/53000/5300$i/" static-nodes.json
 
-#write forloop to shift all the files to given directory
-cp static-nodes.json genesis.json ../../Node-0/data/
-cp static-nodes.json genesis.json ../../Node-1/data/
-cp static-nodes.json genesis.json ../../Node-2/data/
-cp static-nodes.json genesis.json ../../Node-3/data/
-cp static-nodes.json genesis.json ../../Node-4/data/
+done 
 
-#Another for loop needed
-cd validator0; cp nodekey* address ../../Node-0/data
-cd ../validator1; cp nodekey* address ../../Node-1/data
-cd ../validator2; cp nodekey* address ../../Node-2/data
-cd ../validator3; cp nodekey* address ../../Node-3/data
-cd ../validator4; cp nodekey* address ../../Node-4/data
+echo "updated static node file"
+cat static-nodes.json
+echo "not using permissioned node "
+#
+# #write forloop to shift all the files to given directory
+# N=5
+# cd QBFT-Network/artifacts/goQuorum
+# echo "in go Quorum"
+# echo "directories"
+echo "displaying director structure. Currently in directory $PWD"
+tree
+sleep 5
 
-#Another for loop needed
-cd ../validator0; cp account* ../../Node-0/data/keystore
-cd ../validator1; cp account* ../../Node-1/data/keystore
-cd ../validator2; cp account* ../../Node-2/data/keystore
-cd ../validator3; cp account* ../../Node-3/data/keystore
-cd ../validator4; cp account* ../../Node-4/data/keystore
+for ((i=0; i<$N; i++))
+do 
+    echo "Shifting genesis file"
+    cp static-nodes.json genesis.json ../../Node-$i/data/
+done 
+cd ..
+#in goQuorum folder
+echo "currently in folder $PWD"
+sleep 5
 
-#Initializing the nodes. Need for another forloop
+echo "tree here is" 
+tree
+
+for ((i=0; i<$N; i++))
+do 
+    echo "Moving node data"
+    cd validator$i
+    cp nodekey* address ../../Node-$i/data
+    cd ..
+    ls
+done 
+
+cd validator0
+echo "Changed to the validator0 directory. Currently in directory $PWD"
+for ((i=0; i<$N; i++))
+do 
+   echo "copying data keystore"
+   cd ../validator$i
+   cp account* ../../Node-$i/data/keystore
+done 
+
+if [ $? -eq 0 ]; then
+  echo "successfully moved validator directory "
+else
+  echo "unable to move Validator directory .... exiting "
+  exit 0
+fi
+# initializing the nodes.
 cd ../../Node-0
-geth --datadir data init data/genesis.json
-cd ../../Node-1
-geth --datadir data init data/genesis.json
-cd ../../Node-2
-geth --datadir data init data/genesis.json
-cd ../../Node-3
-geth --datadir data init data/genesis.json
-cd ../../Node-4
-geth --datadir data init data/genesis.json
+for ((i=0; i<$N; i++))
+do 
+    echo "installing node $i"
+    cd ../Node-$i
+    geth --datadir data init data/genesis.json
+done 
 
-#Starting Node 0
-#Need another for loop
-echo "Starting Node 0"
-export ADDRESS=$(grep -o '"address": *"[^"]*"' ./data/keystore/accountKeystore | grep -o '"[^"]*"$' | sed 's/"//g')
-export PRIVATE_CONFIG=ignore
-geth --datadir data \
+# Starting nodes
+for ((i=0; i<$N; i++))
+do 
+    echo "Starting Node $i"
+    cd ../Node-$i
+    echo "present directory is $PWD"
+    export ADDRESS=$(grep -o '"address": *"[^"]*"' ./data/keystore/accountKeystore | grep -o '"[^"]*"$' | sed 's/"//g')
+    export PRIVATE_CONFIG=ignore
+    geth --datadir data \
     --networkid 1337 --nodiscover --verbosity 5 \
     --syncmode full \
     --istanbul.blockperiod 5 --mine --miner.threads 1 --miner.gasprice 0 --emitcheckpoints \
-    --http --http.addr 127.0.0.1 --http.port 22000 --http.corsdomain "*" --http.vhosts "*" \
-    --ws --ws.addr 127.0.0.1 --ws.port 32000 --ws.origins "*" \
+    --http --http.addr 127.0.0.1 --http.port 2200$1 --http.corsdomain "*" --http.vhosts "*" \
+    --ws --ws.addr 127.0.0.1 --ws.port 3200$1 --ws.origins "*" \
     --http.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
     --ws.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
     --unlock ${ADDRESS} --allow-insecure-unlock --password ./data/keystore/accountPassword \
-    --port 30300 &
+    --port 3030$i &
 
-#Check whether  the command was successfully executed or not and then proceed
-echo "Starting Node 1"
-export ADDRESS=$(grep -o '"address": *"[^"]*"' ./data/keystore/accountKeystore | grep -o '"[^"]*"$' | sed 's/"//g')
-export PRIVATE_CONFIG=ignore
-geth --datadir data \
-    --networkid 1337 --nodiscover --verbosity 5 \
-    --syncmode full \
-    --istanbul.blockperiod 5 --mine --miner.threads 1 --miner.gasprice 0 --emitcheckpoints \
-    --http --http.addr 127.0.0.1 --http.port 22000 --http.corsdomain "*" --http.vhosts "*" \
-    --ws --ws.addr 127.0.0.1 --ws.port 32000 --ws.origins "*" \
-    --http.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
-    --ws.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
-    --unlock ${ADDRESS} --allow-insecure-unlock --password ./data/keystore/accountPassword \
-    --port 30300 &
+done 
 
-echo "Starting Node 2"
-export ADDRESS=$(grep -o '"address": *"[^"]*"' ./data/keystore/accountKeystore | grep -o '"[^"]*"$' | sed 's/"//g')
-export PRIVATE_CONFIG=ignore
-geth --datadir data \
-    --networkid 1337 --nodiscover --verbosity 5 \
-    --syncmode full \
-    --istanbul.blockperiod 5 --mine --miner.threads 1 --miner.gasprice 0 --emitcheckpoints \
-    --http --http.addr 127.0.0.1 --http.port 22000 --http.corsdomain "*" --http.vhosts "*" \
-    --ws --ws.addr 127.0.0.1 --ws.port 32000 --ws.origins "*" \
-    --http.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
-    --ws.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
-    --unlock ${ADDRESS} --allow-insecure-unlock --password ./data/keystore/accountPassword \
-    --port 30300 &
 
-echo "Starting Node 3"
-export ADDRESS=$(grep -o '"address": *"[^"]*"' ./data/keystore/accountKeystore | grep -o '"[^"]*"$' | sed 's/"//g')
-export PRIVATE_CONFIG=ignore
-geth --datadir data \
-    --networkid 1337 --nodiscover --verbosity 5 \
-    --syncmode full \
-    --istanbul.blockperiod 5 --mine --miner.threads 1 --miner.gasprice 0 --emitcheckpoints \
-    --http --http.addr 127.0.0.1 --http.port 22000 --http.corsdomain "*" --http.vhosts "*" \
-    --ws --ws.addr 127.0.0.1 --ws.port 32000 --ws.origins "*" \
-    --http.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
-    --ws.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
-    --unlock ${ADDRESS} --allow-insecure-unlock --password ./data/keystore/accountPassword \
-    --port 30300 &
-
-echo "Starting Node 4"
-export ADDRESS=$(grep -o '"address": *"[^"]*"' ./data/keystore/accountKeystore | grep -o '"[^"]*"$' | sed 's/"//g')
-export PRIVATE_CONFIG=ignore
-geth --datadir data \
-    --networkid 1337 --nodiscover --verbosity 5 \
-    --syncmode full \
-    --istanbul.blockperiod 5 --mine --miner.threads 1 --miner.gasprice 0 --emitcheckpoints \
-    --http --http.addr 127.0.0.1 --http.port 22000 --http.corsdomain "*" --http.vhosts "*" \
-    --ws --ws.addr 127.0.0.1 --ws.port 32000 --ws.origins "*" \
-    --http.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
-    --ws.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
-    --unlock ${ADDRESS} --allow-insecure-unlock --password ./data/keystore/accountPassword \
-    --port 30300 &
-
-#Attaching geth to the node 0
-geth attach data/geth.ipc

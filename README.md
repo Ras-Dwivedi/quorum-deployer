@@ -8,6 +8,7 @@ This repo sets up a devlopment quorum network with QBFT consensus. Default numbe
 4. [Tessera](https://docs.tessera.consensys.net/en/stable/HowTo/Get-started/Install/Distribution/)
 
 ## How to Deploy the betwork
+run ```source ~/.bashrc ~/.bash_profile ~/.profile``` to access latest version of node and geth 
 run ```./byfn.sh```
 5-node network with geth attached to Node-0 should start.
 

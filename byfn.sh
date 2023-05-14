@@ -51,7 +51,7 @@ echo "Following directories were created "
 tree
 
 #Generating artifacts
-npx quorum-genesis-tool --consensus qbft --chainID 1337 --blockperiod 5 --requestTimeout 10 --epochLength 30000 --difficulty 1 --gasLimit '0xFFFFFF' --coinbase '0x0000000000000000000000000000000000000000' --validators $N --members 0 --bootnodes 0 --outputPath 'artifacts'
+npx quorum-genesis-tool --consensus qbft --chainID 1337 --blockperiod 5 --requestTimeout 400 --epochLength 30000 --difficulty 1 --gasLimit '0xFFFFFF' --coinbase '0x0000000000000000000000000000000000000000' --validators $N --members 0 --bootnodes 0 --outputPath 'artifacts'
 
 # #check whether this command was executed successfully
 if [ $? -eq 0 ]; then
@@ -92,6 +92,9 @@ echo "not using permissioned node "
 echo "displaying director structure. Currently in directory $PWD"
 tree
 sleep 5
+
+echo "setting empty block time period to 300"
+sed -i 's/"emptyblockperiodseconds": 60/"emptyblockperiodseconds": 300/g' genesis.json
 
 for ((i=0; i<$N; i++))
 do 
@@ -152,7 +155,7 @@ do
     --syncmode full \
     --istanbul.blockperiod 5 --mine --miner.threads 1 --miner.gasprice 0 --emitcheckpoints \
     --http --http.addr 0.0.0.0 --http.port 2200$i --http.corsdomain "*" --http.vhosts "*" \
-    --ws --ws.addr 0.0.0.0 --ws.port 3200$i --ws.origins "*" \
+    --graphql --ws --ws.addr 0.0.0.0 --ws.port 3200$i --ws.origins "*" \
     --http.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
     --ws.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
     --unlock ${ADDRESS} --allow-insecure-unlock --password ./data/keystore/accountPassword \

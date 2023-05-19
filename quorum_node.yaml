@@ -1,0 +1,255 @@
+---
+- name: Quorum Deployer
+  hosts: servers
+  gather_facts: true
+
+  vars:
+    quorum_path: /opt/goquorum
+    tessera_path: /opt/tessera
+  tasks:
+    - name: Update apt cache
+      become: true
+      apt:
+        update_cache: yes
+
+    - name: Uninstall Node.js if it is installed
+      become: true
+      apt:
+        name: nodejs
+        state: absent
+
+    - name: Install the nodejs
+      become: true
+      apt:
+        name: nodejs
+        state: present
+
+    - name: Install GCC
+      apt:
+        name: gcc
+        state: latest
+
+    - name: Install GoQuorum dependencies
+      apt:
+        name: [build-essential, unzip, tree]
+        state: present
+
+    - name: Download GoQuorum
+      get_url:
+        url: "https://artifacts.consensys.net/public/go-quorum/raw/versions/v23.4.0/geth_v23.4.0_linux_amd64.tar.gz"
+        dest: /tmp/goquorum.tar.gz
+
+    - name: Create GoQuorum & tessera directory
+      file:
+        path: /opt/{{ item }}
+        state: directory
+        owner: root
+        group: root
+        mode: 0755
+      loop:
+        - goquorum
+        - tessera
+
+    - name: Extract GoQuorum
+      unarchive:
+        src: /tmp/goquorum.tar.gz
+        dest: /opt/goquorum
+        # remote_src: true
+        # extra_opts: [--strip-components=1]
+
+    - name: Install Quorum Genesis Tool
+      npm:
+        name: quorum-genesis-tool
+        state: latest
+        global: yes
+
+    - name: Install Java JDK
+      apt:
+        name: openjdk-11-jdk
+        state: present
+
+    - name: Install libsodium
+      apt:
+        name: libsodium-dev
+        state: present
+
+    # install tessera
+    - name: Download Tessera
+      get_url:
+        url: "https://s01.oss.sonatype.org/service/local/repositories/releases/content/net/consensys/quorum/tessera/tessera-dist/23.4.0/tessera-dist-23.4.0.tar"
+        dest: /tmp/tessera.tar
+        mode: 0644
+
+    - name: Extract Tessera
+      unarchive:
+        src: /tmp/tessera.tar
+        dest: /opt/tessera
+        remote_src: true
+
+    - name: Add quorum to path
+      lineinfile:
+        dest: ~/.bashrc
+        line: "export PATH=$PATH:{{ quorum_path }}"
+        state: present
+        insertafter: BOF
+      register: quorum_path
+
+    - name: Add tessera to path
+      lineinfile:
+        dest: ~/.bashrc
+        line: "export PATH=$PATH:{{ tessera_path }}"
+        state: present
+        insertafter: BOF
+      register: tessera_path
+
+    - name: Reload the shell
+      shell: source ~/.bashrc
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}"
+      when: quorum_path.changed
+
+    - name: Verify updated PATH
+      shell: echo $PATH
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}"
+      register: path
+
+    - name: Print PATH
+      debug:
+        var: path.stdout_lines
+
+
+    - name: Create directory structure
+      shell: |
+        if [[ -d QBFT-Network ]]; then
+          rm -rf QBFT-Network
+          mkdir -p QBFT-Network/Node/data/keystore
+        else
+          mkdir -p QBFT-Network/Node/data/keystore
+        fi
+        if [[ -d artifacts ]]; then
+          rm -rf artifacts
+        fi
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}"
+
+    - name: Create directory structure
+      file:
+        path: "QBFT-Network/Node/data/keystore"
+        state: directory
+        mode: "0755"
+
+    - name: Generate artifacts
+      shell: |
+        npx quorum-genesis-tool --consensus qbft --chainID 1337 --blockperiod 5 --requestTimeout 10 --epochLength 30000 --difficulty 1 --gasLimit '0xFFFFFF' --coinbase '0x0000000000000000000000000000000000000000' --validators 1 --members 0 --bootnodes 0 --outputPath 'artifacts'
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}"
+      register: generate_artifacts
+      failed_when: generate_artifacts.rc != 0
+
+    - name: Move generated artifacts
+      shell: |
+        mv artifacts/$(ls artifacts)/* artifacts/
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}"
+
+    - name: Update IP and ports
+      shell: |
+        cd artifacts/goQuorum
+        sed -i "$3 s/<HOST>/127.0.0.1/" static-nodes.json
+        sed -i "$3 s/30303/30301/" static-nodes.json
+        sed -i "$3 s/53000/53001/" static-nodes.json
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}"
+
+    - name: Display updated static node file
+      shell: cat artifacts/goQuorum/static-nodes.json
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}"
+
+    - name: Shift genesis file
+      shell: cp artifacts/goQuorum/static-nodes.json artifacts/goQuorum/genesis.json QBFT-Network/Node/data
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}"
+
+    - name: Moving Node data
+      shell: cp artifacts/validator0/nodekey* artifacts/validator0/address QBFT-Network/Node/data
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}"
+
+    - name: Copying data keystore
+      shell: cp artifacts/validator0/account* QBFT-Network/Node/data/keystore
+
+    - name: Check Geth
+      shell: geth version
+      register: geth_version_output
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}"
+
+
+    - name: Display Geth version
+      debug:
+        var: geth_version_output.stdout
+
+    - name: Check Node.js Version
+      shell: node --version
+      register: node_version_output
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}"
+
+    - name: Display Node.js Version
+      debug:
+        var: node_version_output.stdout
+
+    - name: Initialize nodes
+      shell: geth --datadir data init data/genesis.json
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}/QBFT-Network/Node"
+
+    - name: Start Node
+      shell: |
+        export ADDRESS=$(grep -o '"address": *"[^"]*"' ./data/keystore/accountKeystore | grep -o '"[^"]*"$' | sed 's/"//g')
+        export PRIVATE_CONFIG=ignore
+        geth --datadir data \
+        --networkid 1337 --nodiscover --verbosity 5 \
+        --syncmode full \
+        --istanbul.blockperiod 5 --mine --miner.threads 1 --miner.gasprice 0 --emitcheckpoints \
+        --http --http.addr 0.0.0.0 --http.port 22000 --http.corsdomain "*" --http.vhosts "*" \
+        --ws --ws.addr 0.0.0.0 --ws.port 32000 --ws.origins "*" \
+        --http.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
+        --ws.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
+        --unlock ${ADDRESS} --allow-insecure-unlock --password ./data/keystore/accountPassword \
+        --port 30300 > /dev/null 2>&1 &
+        sleep 5
+      args:
+        executable: /bin/bash
+        chdir: "{{ playbook_dir }}/QBFT-Network/Node"
+      register: start_node_output
+
+    - name: Delay for node startup
+      pause:
+        seconds: 10
+      when: start_node_output.stdout is defined
+
+    - name: Check node responsiveness
+      uri:
+        url: "http://localhost:22000"  
+        return_content: no
+        status_code: 200
+      register: node_check
+      retries: 10
+      delay: 50
+      until: node_check.status == 200
+      when: start_node_output.stdout is defined

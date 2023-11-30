@@ -24,3 +24,4 @@ geth --datadir data \
 --ws.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
 --unlock ${ADDRESS} --allow-insecure-unlock --password ./data/keystore/accountPassword \
 --port 30303 &
+disown

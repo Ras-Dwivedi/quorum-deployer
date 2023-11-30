@@ -1,0 +1,86 @@
+---
+# - name: My First Ansible Playbook
+#   hosts: web_servers
+#   become: true  # Run tasks with elevated privileges (sudo)
+
+#   tasks:
+#     - name: Ensure Nginx is installed
+#       apt:
+#         name: nginx
+#         state: present  # Ensure the package is installed
+    # - name: Copy Node Folder
+    #   ansible.builtin.copy:
+    #     src: /path/to/local/folder/node{{ inventory_hostname | replace('server', '') }}
+    #     dest: ~/rasdwivedi/.
+    #   delegate_to: "{{ inventory_hostname }}"
+    # - name: Ensure Nginx service is running
+    #   service:
+    #     name: nginx
+    #     state: started  # Ensure the service is running
+    #     enabled: true   # Start on boot
+
+- name: Create Blockchain folders on Servers
+  hosts: web_servers  # Replace with your server group from the inventory
+  # become: true  # If you need elevated privileges
+
+  tasks:
+    # - name: Delete Quorum Folder if it exists
+    #   ansible.builtin.file:
+    #     path: "~/rasdwivedi/ansible_blockchain/quorum"
+    #     state: absent
+    # - name: Create Ansible Blockchain Folder
+    #   ansible.builtin.file:
+    #     path: "~/rasdwivedi/ansible_blockchain/quorum"
+    #     state: directory
+    #     owner: rasdwivedi  # Replace with the actual username
+    #     group: rasdwivedi     # Replace with the actual group
+    #     mode: 0755
+    # - name: Copy Node Folder
+    #   ansible.builtin.copy:
+    #     src: ../QBFT-Network/Node-{{ inventory_hostname | replace('server', '') }}/.
+    #     dest: ~/rasdwivedi/ansible_blockchain/quorum/Node/
+    #   delegate_to: "{{ inventory_hostname }}"
+    - name: Copy Installation Script Folder
+      ansible.builtin.copy:
+        src: ./startNode.sh
+        dest: ~/rasdwivedi/ansible_blockchain/quorum/Node/.
+      delegate_to: "{{ inventory_hostname }}"
+    - name: Install blockchain node
+      ansible.builtin.shell: |
+          # echo "installing node $i"
+          # echo "present directory is "
+          echo $PWD
+          cd ~/rasdwivedi/ansible_blockchain/quorum/Node
+          bash -c "source ~/.bash_profile"
+          bash -c "source ~/.bashrc"
+          bash -c "source ~/.profile"
+          bash -c "source ~/.bash_profile && geth --datadir data init data/genesis.json"
+        
+    - name: Start Geth node
+      ansible.builtin.shell: |
+        echo "Starting Node $i"
+        cd ~/rasdwivedi/ansible_blockchain/quorum/Node
+        echo "Present directory is $PWD"
+        bash -c "source ~/.bash_profile"
+        bash -c "source ~/.bashrc"
+        bash -c "source ~/.profile"
+
+        # source ~/.bashrc
+        # source ~/.profile
+        export ADDRESS=$(grep -o '"address": *"[^"]*"' ./data/keystore/accountKeystore | grep -o '"[^"]*"$' | sed 's/"//g')
+        export PRIVATE_CONFIG=ignore
+        geth --datadir data \
+          --networkid 1337 --nodiscover --verbosity 5 \
+          --syncmode full \
+          --istanbul.blockperiod 5 --mine --miner.threads 1 --miner.gasprice 0 --emitcheckpoints \
+          --http --http.addr 0.0.0.0 --http.port 22001 --http.corsdomain "*" --http.vhosts "*" \
+          --graphql --ws --ws.addr 0.0.0.0 --ws.port 32001 --ws.origins "*" \
+          --http.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
+          --ws.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
+          --unlock ${ADDRESS} --allow-insecure-unlock --password ./data/keystore/accountPassword \
+          --port 30303 &
+    # - name: Ensure Nginx service is running
+    #   service:
+    #     name: nginx
+    #     state: started  # Ensure the service is running
+    #     enabled: true   # Start on boot

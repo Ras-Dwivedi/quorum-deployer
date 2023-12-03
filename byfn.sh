@@ -52,7 +52,7 @@ echo "Following directories were created "
 tree
 
 #Generating artifacts
-npx quorum-genesis-tool --consensus qbft --chainID 1337 --blockperiod 5 --requestTimeout 400 --epochLength 30000 --difficulty 1 --gasLimit '0xFFFFFF' --coinbase '0x0000000000000000000000000000000000000000' --validators $N --members 0 --bootnodes 0 --outputPath 'artifacts'
+npx quorum-genesis-tool --consensus ibft --chainID 1337 --blockperiod 5 --requestTimeout 400 --epochLength 30000 --difficulty 1 --gasLimit '0xFFFFFF' --coinbase '0x0000000000000000000000000000000000000000' --validators $N --members 0 --bootnodes 0 --outputPath 'artifacts'
 
 # #check whether this command was executed successfully
 if [ $? -eq 0 ]; then

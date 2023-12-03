@@ -3,41 +3,35 @@
 #   hosts: web_servers
 #   become: true  # Run tasks with elevated privileges (sudo)
 
-    # - name: Copy Node Folder
-    #   ansible.builtin.copy:
-    #     src: /path/to/local/folder/node{{ inventory_hostname | replace('server', '') }}
-    #     dest: ~/rasdwivedi/.
-    #   delegate_to: "{{ inventory_hostname }}"
-    # - name: Ensure Nginx service is running
-    #   service:
-    #     name: nginx
-    #     state: started  # Ensure the service is running
-    #     enabled: true   # Start on boot
-
 - name: Create Blockchain folders on Servers
   hosts: web_servers  # Replace with your server group from the inventory
   # become: true  # If you need elevated privileges
 
   tasks:
-    # - name: Delete Quorum Folder if it exists
-    #   ansible.builtin.file:
-    #     path: "~/rasdwivedi/ansible_blockchain/quorum"
-    #     state: absent
-    # - name: Create Ansible Blockchain Folder
-    #   ansible.builtin.file:
-    #     path: "~/rasdwivedi/ansible_blockchain/quorum"
-    #     state: directory
-    #     owner: rasdwivedi  # Replace with the actual username
-    #     group: rasdwivedi     # Replace with the actual group
-    #     mode: 0755
-    # - name: Copy Node Folder
-    #   ansible.builtin.copy:
-    #     src: ../QBFT-Network/Node-{{ inventory_hostname | replace('server', '') }}/.
-    #     dest: ~/rasdwivedi/ansible_blockchain/quorum/Node/
-    #   delegate_to: "{{ inventory_hostname }}"
+    - name: Delete Quorum Folder if it exists
+      ansible.builtin.file:
+        path: "~/rasdwivedi/ansible_blockchain/quorum"
+        state: absent
+    - name: Create Ansible Blockchain Folder
+      ansible.builtin.file:
+        path: "~/rasdwivedi/ansible_blockchain/quorum"
+        state: directory
+        owner: rasdwivedi  # Replace with the actual username
+        group: rasdwivedi     # Replace with the actual group
+        mode: 0755
+    - name: Copy Node Folder
+      ansible.builtin.copy:
+        src: ../QBFT-Network/Node-{{ inventory_hostname | replace('server', '') }}/.
+        dest: ~/rasdwivedi/ansible_blockchain/quorum/Node/
+      delegate_to: "{{ inventory_hostname }}"
     - name: Copy Installation Script Folder
       ansible.builtin.copy:
         src: ./startNode.sh
+        dest: ~/rasdwivedi/ansible_blockchain/quorum/Node/.
+      delegate_to: "{{ inventory_hostname }}"
+    - name: Copy geth kill Script Folder
+      ansible.builtin.copy:
+        src: ../killGeth.sh
         dest: ~/rasdwivedi/ansible_blockchain/quorum/Node/.
       delegate_to: "{{ inventory_hostname }}"
     # - name: Set Execution Permission for Installation Script

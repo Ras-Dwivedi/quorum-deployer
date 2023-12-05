@@ -52,7 +52,7 @@ echo "Following directories were created "
 tree
 
 #Generating artifacts
-npx quorum-genesis-tool --consensus ibft --chainID 1337 --blockperiod 5 --requestTimeout 400 --epochLength 30000 --difficulty 1 --gasLimit '0xFFFFFF' --coinbase '0x0000000000000000000000000000000000000000' --validators $N --members 0 --bootnodes 0 --outputPath 'artifacts'
+npx quorum-genesis-tool --consensus raft --chainID 1337 --blockperiod 5 --requestTimeout 400 --epochLength 30000 --difficulty 1 --gasLimit '0xFFFFFF' --coinbase '0x0000000000000000000000000000000000000000' --validators $N --members 0 --bootnodes 0 --outputPath 'artifacts'
 
 # #check whether this command was executed successfully
 if [ $? -eq 0 ]; then
@@ -91,28 +91,6 @@ for ip_address in $ip_addresses; do
     ((i++))
 done
 cat $json_file
-
-# ------------
-
-# #update IP and port number
-# for ((i=0; i<$N; i++))
-# do 
-#    echo "----------- for $i ------------"    
-#    sed -i "$((i+2)) s/<HOST>/127.0.0.1/" static-nodes.json
-#   #  sed -i "$((i+2)) s/30303/3030$i/" static-nodes.json
-#   #  sed -i "$((i+2)) s/53000/5300$i/" static-nodes.json
-
-# done 
-
-# echo "updated static node file"
-# cat static-nodes.json
-# echo "not using permissioned node "
-#
-# #write forloop to shift all the files to given directory
-# N=5
-# cd QBFT-Network/artifacts/goQuorum
-# echo "in go Quorum"
-# echo "directories"
 echo "displaying director structure. Currently in directory $PWD"
 tree
 sleep 5
@@ -161,38 +139,7 @@ fi
 echo $PWD
 cd ../../../ansible
 echo $PWD
-# # initializing the nodes.
-# cd ../../Node-0
-# for ((i=0; i<$N; i++))
-# do 
-#     echo "installing node $i"
-#     cd ../Node-$i
-#     geth --datadir data init data/genesis.json
-# done 
-
-# Starting nodes
-# for ((i=0; i<$N; i++))
-# do 
-#     echo "Starting Node $i"
-#     cd ../Node-$i
-#     echo "present directory is $PWD"
-#     export ADDRESS=$(grep -o '"address": *"[^"]*"' ./data/keystore/accountKeystore | grep -o '"[^"]*"$' | sed 's/"//g')
-#     export PRIVATE_CONFIG=ignore
-#     geth --datadir data \
-#     --networkid 1337 --nodiscover --verbosity 5 \
-#     --syncmode full \
-#     --istanbul.blockperiod 5 --mine --miner.threads 1 --miner.gasprice 0 --emitcheckpoints \
-#     --http --http.addr 0.0.0.0 --http.port 2200$i --http.corsdomain "*" --http.vhosts "*" \
-#     --graphql --ws --ws.addr 0.0.0.0 --ws.port 3200$i --ws.origins "*" \
-#     --http.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
-#     --ws.api admin,eth,debug,miner,net,txpool,personal,web3,istanbul \
-#     --unlock ${ADDRESS} --allow-insecure-unlock --password ./data/keystore/accountPassword \
-#     --port 3030$i &
-#     sleep 5
-#     disown 
-
-# done 
-
+########
 echo "Deploying blockchain on each of the nodes"
 ansible-playbook -i inventory.ini playbook.yml
 if [ $? -eq 0 ]; then
